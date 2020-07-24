@@ -1,0 +1,13 @@
+[package]
+name = "gitools"
+version = "0.1.0"
+authors = ["Kiran Sebastian <kiranjoysebastian@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4"
+log = "*"
+fern = "0.6"
+git2 = "0.13"
+druid = "0.6.0"
