@@ -1,6 +1,6 @@
 use anyhow::Result;
 use druid::widget::{Container, Flex, Label};
-use druid::{AppLauncher, Color, Env, Widget, WidgetExt, WindowDesc};
+use druid::{AppLauncher, Color, DelegateCtx, Env, Event, Widget, WidgetExt, WindowDesc, WindowId};
 use git2::Repository;
 use log::info;
 use state::AppState;
@@ -11,6 +11,7 @@ extern crate anyhow;
 mod git;
 mod state;
 mod theme;
+mod widget;
 
 fn main() -> Result<()> {
     setup_logger().expect("Failed to setup logger");
@@ -25,6 +26,7 @@ fn main() -> Result<()> {
 
     let app_state = AppState {
         repo_header: git::get_repo_header(&repo)?,
+        cheatsheet: widget::CheatSheetState { is_hidden: true },
     };
 
     info!("Starting application...");
@@ -36,10 +38,13 @@ fn main() -> Result<()> {
 }
 
 fn build_root() -> impl Widget<AppState> {
-    let contents = Flex::column().with_child(git::build_repo_header());
+    let cheatsheet = widget::CheatSheet::new().with_cheat("b".to_owned(), "Branches".to_owned());
+    let contents = Flex::column()
+        .with_child(git::build_repo_header())
+        .with_child(cheatsheet);
     let container = Container::new(contents).background(theme::BASE_3);
-    // container.debug_paint_layout()
-    container
+    container.debug_paint_layout()
+    // container
 }
 
 fn configure_env(env: &mut Env, app: &AppState) {

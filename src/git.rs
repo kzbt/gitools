@@ -6,7 +6,7 @@ use druid::{Data, Env, Widget, WidgetExt};
 use git2::{DescribeFormatOptions, DescribeOptions, Reference, Repository};
 use log::info;
 
-#[derive(Clone, Data)]
+#[derive(Clone, Data, Debug)]
 pub struct RepoHeader {
     local_head: (String, String),
     remote_head: (String, String),
