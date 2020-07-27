@@ -1,0 +1,9 @@
+[keymap.map.b]
+key = "b"
+name = "Branching"
+next = { b = {key = "b", name = "Checkout", command = "BranchCheckout" } }
+
+[keymap.map.c]
+key = "c"
+name = "Committing"
+next = { c = { key = "c", name = "Commit", command = "Commit" } }

@@ -3,7 +3,8 @@ use druid::widget::{Container, Flex, Label};
 use druid::{AppLauncher, Color, DelegateCtx, Env, Event, Widget, WidgetExt, WindowDesc, WindowId};
 use git2::Repository;
 use log::info;
-use state::AppState;
+use state::{AppState, CheatSheetState, Command, Config, KeyMap, KeyMapLevel, L1Node, L2Node};
+use std::rc::Rc;
 
 #[macro_use]
 extern crate anyhow;
@@ -24,9 +25,18 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let repo = Repository::open(&args[1])?;
 
+    let config_str = std::fs::read_to_string("./config.toml").unwrap();
+
+    let config: Config = toml::from_str(&config_str).unwrap();
+
     let app_state = AppState {
         repo_header: git::get_repo_header(&repo)?,
-        cheatsheet: widget::CheatSheetState { is_hidden: true },
+        cheatsheet: CheatSheetState {
+            is_hidden: true,
+            keymap: config.keymap.map,
+            current_node: 0,
+            current_level: KeyMapLevel::L1,
+        },
     };
 
     info!("Starting application...");
@@ -38,7 +48,7 @@ fn main() -> Result<()> {
 }
 
 fn build_root() -> impl Widget<AppState> {
-    let cheatsheet = widget::CheatSheet::new().with_cheat("b".to_owned(), "Branches".to_owned());
+    let cheatsheet = widget::CheatSheet::new();
     let contents = Flex::column()
         .with_child(git::build_repo_header())
         .with_child(cheatsheet);

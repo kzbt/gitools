@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::state::{AppState, CheatSheetState, Command, KeyMapLevel, L1Node, L2Node};
 use crate::theme;
 use anyhow::Result;
 use druid::widget::{Flex, Label};
@@ -6,21 +6,26 @@ use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, KeyCode, LayoutCtx, Lens, LifeCycle, LifeCycleCtx,
     PaintCtx, Rect, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
-use keyboard_types::Code;
+use druid::{Code, KbKey};
+use std::rc::Rc;
 
-pub struct Cheat {
+fn key_str_to_u8<T: AsRef<str>>(key: T) -> u8 {
+    *key.as_ref().as_bytes().get(0).unwrap()
+}
+
+pub struct CheatLabel {
     key: WidgetPod<(), Label<()>>,
     desc: WidgetPod<(), Label<()>>,
     origin: (f64, f64),
 }
 
-impl Cheat {
+impl CheatLabel {
     pub fn new(key: String, desc: String, origin: (f64, f64)) -> Self {
         let lbl_key = Label::new(key).with_text_color(theme::BLUE);
         let desc = "-> ".to_owned() + &desc;
         let lbl_desc = Label::new(desc).with_text_color(theme::GREEN);
 
-        Cheat {
+        CheatLabel {
             key: WidgetPod::new(lbl_key),
             desc: WidgetPod::new(lbl_desc),
             origin: origin,
@@ -29,23 +34,44 @@ impl Cheat {
 }
 
 pub struct CheatSheet {
-    cheats: Vec<Cheat>,
-}
-
-#[derive(Clone, Data, Lens, Debug)]
-pub struct CheatSheetState {
-    pub is_hidden: bool,
+    cheat_menu: Vec<CheatLabel>,
 }
 
 impl CheatSheet {
     pub fn new() -> Self {
-        CheatSheet { cheats: vec![] }
+        CheatSheet { cheat_menu: vec![] }
     }
 
-    pub fn with_cheat(mut self, key: String, desc: String) -> Self {
-        let cheat = Cheat::new(key, desc, (0.0, 0.0));
-        self.cheats.push(cheat);
-        self
+    fn update_labels(&mut self, data: &AppState) {
+        if data.cheatsheet.is_hidden {
+            return;
+        }
+
+        self.cheat_menu.clear();
+
+        match data.cheatsheet.current_level {
+            KeyMapLevel::L1 => {
+                println!("L1 level");
+                for (key, keymap) in data.cheatsheet.keymap.iter() {
+                    self.cheat_menu.push(CheatLabel::new(
+                        std::str::from_utf8(&[*key]).unwrap().to_owned(),
+                        keymap.name.clone(),
+                        (0.0, 0.0),
+                    ))
+                }
+            }
+            KeyMapLevel::L2(parent_node) => {
+                if let Some(l1_node) = data.cheatsheet.keymap.get(&parent_node) {
+                    for (key, keymap) in l1_node.next.iter() {
+                        self.cheat_menu.push(CheatLabel::new(
+                            std::str::from_utf8(&[*key]).unwrap().to_owned(),
+                            keymap.name.clone(),
+                            (0.0, 0.0),
+                        ))
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -54,14 +80,17 @@ impl Widget<AppState> for CheatSheet {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        _data: &AppState,
+        data: &AppState,
         _env: &Env,
     ) {
         match event {
-            LifeCycle::WidgetAdded => ctx.register_for_focus(),
+            LifeCycle::WidgetAdded => {
+                ctx.register_for_focus();
+            }
             _ => (),
         }
-        for cheat in self.cheats.iter_mut() {
+
+        for cheat in self.cheat_menu.iter_mut() {
             cheat.key.lifecycle(ctx, event, &(), _env);
             cheat.desc.lifecycle(ctx, event, &(), _env);
         }
@@ -70,38 +99,52 @@ impl Widget<AppState> for CheatSheet {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         ctx.request_focus();
 
-        match event {
-            Event::KeyUp(key_event) => match key_event.code {
+        if let Event::KeyUp(key_event) = event {
+            let code = key_event.code;
+            let key = &key_event.key;
+
+            match code {
                 Code::Space => {
                     data.cheatsheet.is_hidden = false;
-                    return;
                 }
                 Code::Escape => {
                     if !data.cheatsheet.is_hidden {
                         data.cheatsheet.is_hidden = true;
-                        return;
+                        data.cheatsheet.current_node = 0;
+                        data.cheatsheet.current_level = KeyMapLevel::L1;
                     }
                 }
-                _ => (),
-            },
-            _ => (),
-        }
-
-        for cheat in self.cheats.iter_mut() {
-            // cheat.key.event(ctx, event, &mut (), env);
-            // cheat.desc.event(ctx, event, &mut (), env);
+                Code::Backspace => {
+                    if !data.cheatsheet.is_hidden {
+                        if let KeyMapLevel::L2(_) = data.cheatsheet.current_level {
+                            data.cheatsheet.current_node = 0;
+                            data.cheatsheet.current_level = KeyMapLevel::L1;
+                        } else {
+                            data.cheatsheet.is_hidden = true;
+                        }
+                    }
+                }
+                _ => {
+                    if let KbKey::Character(c) = key {
+                        if let Some(l1_node) = data.cheatsheet.keymap.get(&key_str_to_u8(c)) {
+                            data.cheatsheet.current_node = l1_node.key;
+                            data.cheatsheet.current_level = KeyMapLevel::L2(l1_node.key);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &AppState, data: &AppState, env: &Env) {
-        dbg!(data);
-
+    fn update(&mut self, ctx: &mut UpdateCtx, _old: &AppState, data: &AppState, env: &Env) {
         if data.cheatsheet.is_hidden {
             ctx.request_layout();
             return;
         }
 
-        for cheat in self.cheats.iter_mut() {
+        self.update_labels(data);
+
+        for cheat in self.cheat_menu.iter_mut() {
             cheat.key.update(ctx, &(), env);
             cheat.desc.update(ctx, &(), env);
         }
@@ -122,7 +165,7 @@ impl Widget<AppState> for CheatSheet {
 
         let child_bc = bc.loosen();
 
-        for (i, cheat) in self.cheats.iter_mut().enumerate() {
+        for (i, cheat) in self.cheat_menu.iter_mut().enumerate() {
             let key_size = cheat.key.layout(ctx, &child_bc, &(), env);
             // cheat.origin =
             cheat.key.set_layout_rect(
@@ -151,7 +194,7 @@ impl Widget<AppState> for CheatSheet {
             return;
         }
 
-        for cheat in self.cheats.iter_mut() {
+        for cheat in self.cheat_menu.iter_mut() {
             cheat.key.paint(ctx, &(), env);
             cheat.desc.paint(ctx, &(), env);
         }
