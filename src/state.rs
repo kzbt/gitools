@@ -1,11 +1,12 @@
 use crate::git::RepoHeader;
-use druid::{Data, Lens};
+use druid::{Data, Lens, Size};
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 #[derive(Clone, Data, Lens, Debug)]
 pub struct AppState {
+    pub win_size: Size,
     pub repo_header: RepoHeader,
     pub cheatsheet: CheatSheetState,
 }
@@ -25,8 +26,8 @@ pub enum Command {
     Commit,
 }
 
-pub type KeyMap = Rc<HashMap<u8, L1Node>>;
-pub type KeyMapL2 = Rc<HashMap<u8, L2Node>>;
+pub type KeyMap = Rc<BTreeMap<u8, L1Node>>;
+pub type KeyMapL2 = Rc<BTreeMap<u8, L2Node>>;
 
 #[derive(Clone, Data, Debug, Deserialize)]
 pub struct L1Node {
@@ -93,11 +94,11 @@ where
     deserializer.deserialize_str(DeStrAsU8)
 }
 
-fn de_keymap<'de, D>(deserializer: D) -> Result<Rc<HashMap<u8, L1Node>>, D::Error>
+fn de_keymap<'de, D>(deserializer: D) -> Result<Rc<BTreeMap<u8, L1Node>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let str_map = HashMap::<String, L1Node>::deserialize(deserializer)?;
+    let str_map = BTreeMap::<String, L1Node>::deserialize(deserializer)?;
     let result = str_map
         .into_iter()
         .map(|(k, v)| {
@@ -109,11 +110,11 @@ where
     Ok(Rc::new(result))
 }
 
-fn de_keymap_l2<'de, D>(deserializer: D) -> Result<Rc<HashMap<u8, L2Node>>, D::Error>
+fn de_keymap_l2<'de, D>(deserializer: D) -> Result<Rc<BTreeMap<u8, L2Node>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let str_map = HashMap::<String, L2Node>::deserialize(deserializer)?;
+    let str_map = BTreeMap::<String, L2Node>::deserialize(deserializer)?;
     let result = str_map
         .into_iter()
         .map(|(k, v)| {

@@ -14,11 +14,13 @@ mod state;
 mod theme;
 mod widget;
 
+const WINDOW_SIZE: (f64, f64) = (1000.0, 800.0);
+
 fn main() -> Result<()> {
     setup_logger().expect("Failed to setup logger");
 
     let window = WindowDesc::new(build_root)
-        .window_size((1000.0, 800.0))
+        .window_size(WINDOW_SIZE)
         .resizable(true)
         .title("Git Tools");
 
@@ -30,6 +32,7 @@ fn main() -> Result<()> {
     let config: Config = toml::from_str(&config_str).unwrap();
 
     let app_state = AppState {
+        win_size: WINDOW_SIZE.into(),
         repo_header: git::get_repo_header(&repo)?,
         cheatsheet: CheatSheetState {
             is_hidden: true,

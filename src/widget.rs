@@ -51,7 +51,6 @@ impl CheatSheet {
 
         match data.cheatsheet.current_level {
             KeyMapLevel::L1 => {
-                println!("L1 level");
                 for (key, keymap) in data.cheatsheet.keymap.iter() {
                     self.cheat_menu.push(CheatLabel::new(
                         std::str::from_utf8(&[*key]).unwrap().to_owned(),
@@ -163,11 +162,35 @@ impl Widget<AppState> for CheatSheet {
             return (0.0, 0.0).into();
         }
 
-        let child_bc = bc.loosen();
+        let mut size = bc.max();
+        size.width = size.width - 16.0;
+        size.height = 100.0;
 
-        for (i, cheat) in self.cheat_menu.iter_mut().enumerate() {
+        let max_width = size.width;
+        let mut pos_x = 0.0;
+        let mut pos_y = 0.0;
+        let mut newline = false;
+
+        let child_bc = bc.loosen();
+        for cheat in self.cheat_menu.iter_mut() {
             let key_size = cheat.key.layout(ctx, &child_bc, &(), env);
-            // cheat.origin =
+            let desc_size = cheat.desc.layout(ctx, &child_bc, &(), env);
+
+            let next_width = pos_x + key_size.width + desc_size.width;
+
+            if next_width > max_width {
+                pos_y = pos_y + 16.0;
+                pos_x = 0.0;
+                cheat.origin = (pos_x, pos_y);
+                newline = true;
+            } else {
+                if newline {
+                    pos_x = next_width + 8.0;
+                }
+                cheat.origin = (pos_x, pos_y);
+                pos_x = next_width + 8.0;
+            }
+
             cheat.key.set_layout_rect(
                 ctx,
                 &(),
@@ -175,17 +198,15 @@ impl Widget<AppState> for CheatSheet {
                 Rect::from_origin_size(cheat.origin, key_size),
             );
 
-            let desc_size = cheat.desc.layout(ctx, &child_bc, &(), env);
+            let desc_origin = (cheat.origin.0 + key_size.width, cheat.origin.1);
             cheat.desc.set_layout_rect(
                 ctx,
                 &(),
                 env,
-                Rect::from_origin_size((20.0, 20.0), desc_size),
+                Rect::from_origin_size(desc_origin, desc_size),
             );
         }
 
-        let mut size = bc.max();
-        size.height = 100.0;
         size
     }
 
