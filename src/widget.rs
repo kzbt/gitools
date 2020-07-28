@@ -3,11 +3,10 @@ use crate::theme;
 use anyhow::Result;
 use druid::widget::{Flex, Label};
 use druid::{
-    BoxConstraints, Data, Env, Event, EventCtx, KeyCode, LayoutCtx, Lens, LifeCycle, LifeCycleCtx,
-    PaintCtx, Rect, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
+    BoxConstraints, Color, Data, Env, Event, EventCtx, KeyCode, LayoutCtx, Lens, LifeCycle,
+    LifeCycleCtx, PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 use druid::{Code, KbKey};
-use std::rc::Rc;
 
 fn key_str_to_u8<T: AsRef<str>>(key: T) -> u8 {
     *key.as_ref().as_bytes().get(0).unwrap()
@@ -35,11 +34,15 @@ impl CheatLabel {
 
 pub struct CheatSheet {
     cheat_menu: Vec<CheatLabel>,
+    size: Size,
 }
 
 impl CheatSheet {
-    pub fn new() -> Self {
-        CheatSheet { cheat_menu: vec![] }
+    pub fn new(size: Size) -> Self {
+        CheatSheet {
+            cheat_menu: vec![],
+            size,
+        }
     }
 
     fn update_labels(&mut self, data: &AppState) {
@@ -74,12 +77,16 @@ impl CheatSheet {
     }
 }
 
+const CHEATSHEET_HEIGHT: f64 = 200.0;
+const PADDING_TOP: f64 = 8.0;
+const PADDING_LEFT: f64 = 8.0;
+
 impl Widget<AppState> for CheatSheet {
     fn lifecycle(
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &AppState,
+        _data: &AppState,
         _env: &Env,
     ) {
         match event {
@@ -163,12 +170,16 @@ impl Widget<AppState> for CheatSheet {
         }
 
         let mut size = bc.max();
-        size.width = size.width - 16.0;
-        size.height = 100.0;
+        size.width = size.width;
+        size.height = CHEATSHEET_HEIGHT;
+        self.size = size;
 
         let max_width = size.width;
-        let mut pos_x = 0.0;
-        let mut pos_y = 0.0;
+
+        let font_size = env.get(theme::TEXT_SIZE_NORMAL);
+
+        let mut pos_x = 0.0 + PADDING_LEFT;
+        let mut pos_y = 0.0 + PADDING_TOP;
         let mut newline = false;
 
         let child_bc = bc.loosen();
@@ -179,16 +190,16 @@ impl Widget<AppState> for CheatSheet {
             let next_width = pos_x + key_size.width + desc_size.width;
 
             if next_width > max_width {
-                pos_y = pos_y + 16.0;
-                pos_x = 0.0;
+                pos_y = pos_y + font_size + PADDING_TOP;
+                pos_x = 0.0 + PADDING_LEFT;
                 cheat.origin = (pos_x, pos_y);
                 newline = true;
             } else {
                 if newline {
-                    pos_x = next_width + 8.0;
+                    pos_x = next_width + PADDING_LEFT;
                 }
                 cheat.origin = (pos_x, pos_y);
-                pos_x = next_width + 8.0;
+                pos_x = next_width + PADDING_LEFT;
             }
 
             cheat.key.set_layout_rect(
@@ -215,9 +226,23 @@ impl Widget<AppState> for CheatSheet {
             return;
         }
 
+        let rect = Rect::from(((0.0, 0.0).into(), self.size));
+        let base1_color = env.get(theme::BASE_1);
+        let bg_color = env.get(theme::BASE_3);
+        ctx.blurred_rect(rect, 2.0, &base1_color);
+        ctx.fill(rect, &bg_color);
+
         for cheat in self.cheat_menu.iter_mut() {
             cheat.key.paint(ctx, &(), env);
             cheat.desc.paint(ctx, &(), env);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn cheatsheet_layout_should_be_dynamic() {
+        let cheatsheet = super::CheatSheet::new((1000.0, 800.0).into());
     }
 }

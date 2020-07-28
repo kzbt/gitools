@@ -51,13 +51,14 @@ fn main() -> Result<()> {
 }
 
 fn build_root() -> impl Widget<AppState> {
-    let cheatsheet = widget::CheatSheet::new();
+    let cheatsheet = widget::CheatSheet::new(WINDOW_SIZE.into());
     let contents = Flex::column()
         .with_child(git::build_repo_header())
+        .with_flex_spacer(1.0)
         .with_child(cheatsheet);
     let container = Container::new(contents).background(theme::BASE_3);
-    container.debug_paint_layout()
-    // container
+    // container.debug_paint_layout()
+    container
 }
 
 fn configure_env(env: &mut Env, app: &AppState) {
