@@ -3,7 +3,7 @@ use crate::theme;
 use anyhow::Result;
 use druid::widget::{Align, Container, CrossAxisAlignment, Flex, Label, SizedBox};
 use druid::{Data, Env, Widget, WidgetExt};
-use git2::{DescribeFormatOptions, DescribeOptions, Reference, Repository};
+use git2::{BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository};
 use log::info;
 
 #[derive(Clone, Data, Debug)]
@@ -103,4 +103,29 @@ fn get_latest_tag(repo: &Repository) -> String {
     }
 
     "<no-tags>".to_owned()
+}
+
+pub fn get_branches(repo: &Repository) -> (Vec<String>, Vec<String>) {
+    let branches = repo.branches(None);
+    if branches.is_err() {
+        info!("No branches in repo");
+        return (vec![], vec![]);
+    }
+
+    let (mut local, mut remote) = (vec![], vec![]);
+
+    let branches = branches.unwrap();
+    for b in branches {
+        if b.is_ok() {
+            let (branch, typ) = b.unwrap();
+            if let Ok(Some(branch_name)) = branch.name() {
+                match typ {
+                    BranchType::Local => local.push(branch_name.to_owned()),
+                    BranchType::Remote => remote.push(branch_name.to_owned()),
+                }
+            }
+        }
+    }
+
+    (local, remote)
 }

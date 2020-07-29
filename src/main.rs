@@ -1,10 +1,13 @@
 use anyhow::Result;
 use druid::widget::{Container, Flex, Label};
-use druid::{AppLauncher, Color, DelegateCtx, Env, Event, Widget, WidgetExt, WindowDesc, WindowId};
+use druid::{
+    AppLauncher, Color, DelegateCtx, Env, Event, Selector, Widget, WidgetExt, WindowDesc, WindowId,
+};
 use git2::Repository;
 use log::info;
-use state::{AppState, CheatSheetState, Command, Config, KeyMap, KeyMapLevel, L1Node, L2Node};
+use state::{AppState, CheatSheetState, Command, Config, FuzzybarState, GitState, KeyMapLevel};
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[macro_use]
 extern crate anyhow;
@@ -12,7 +15,7 @@ extern crate anyhow;
 mod git;
 mod state;
 mod theme;
-mod widget;
+mod widgets;
 
 const WINDOW_SIZE: (f64, f64) = (1000.0, 800.0);
 
@@ -31,6 +34,16 @@ fn main() -> Result<()> {
 
     let config: Config = toml::from_str(&config_str).unwrap();
 
+    let (local, remote) = git::get_branches(&repo);
+
+    let mut all_branches = vec![];
+    all_branches.extend(local.iter().cloned());
+    all_branches.extend(remote.iter().cloned());
+
+    let (local, remote, all_b) = (Arc::new(local), Arc::new(remote), Arc::new(all_branches));
+
+    let fuzzybar_source = all_b.clone();
+
     let app_state = AppState {
         win_size: WINDOW_SIZE.into(),
         repo_header: git::get_repo_header(&repo)?,
@@ -39,6 +52,18 @@ fn main() -> Result<()> {
             keymap: config.keymap.map,
             current_node: 0,
             current_level: KeyMapLevel::L1,
+        },
+        fuzzybar: FuzzybarState {
+            is_hidden: true,
+            cmd: Command::ShowMenu,
+            query: "".to_owned(),
+            source: fuzzybar_source.clone(),
+            filtered: fuzzybar_source.clone(),
+        },
+        git: GitState {
+            local_branches: local,
+            remote_branches: remote,
+            all_branches: all_b,
         },
     };
 
@@ -51,20 +76,19 @@ fn main() -> Result<()> {
 }
 
 fn build_root() -> impl Widget<AppState> {
-    let cheatsheet = widget::CheatSheet::new(WINDOW_SIZE.into());
+    let fuzzybar = widgets::fuzzybar::Fuzzybar::new();
+    let cheatsheet = widgets::cheatsheet::CheatSheet::new(WINDOW_SIZE.into());
     let contents = Flex::column()
         .with_child(git::build_repo_header())
         .with_flex_spacer(1.0)
-        .with_child(cheatsheet);
+        .with_child(cheatsheet)
+        .with_child(fuzzybar);
     let container = Container::new(contents).background(theme::BASE_3);
-    // container.debug_paint_layout()
+    // container.debug_paint_layout().debug_widget_id()
     container
 }
 
 fn configure_env(env: &mut Env, app: &AppState) {
-    env.set(theme::FONT_NAME, "Rec Mono Duotone");
-    env.set(theme::TEXT_SIZE_NORMAL, 12.0);
-
     env.set(theme::BASE_3, Color::rgb8(0xfd, 0xf6, 0xe3)); // #fdf6e3
     env.set(theme::BASE_2, Color::rgb8(0xee, 0xe8, 0xd5)); // #eee8d5
     env.set(theme::BASE_1, Color::rgb8(0x93, 0xa1, 0xa1)); // #93a1a1
@@ -82,6 +106,14 @@ fn configure_env(env: &mut Env, app: &AppState) {
     env.set(theme::BLUE, Color::rgb8(0x26, 0x8b, 0xd2)); // #268bd2
     env.set(theme::CYAN, Color::rgb8(0x2a, 0xa1, 0x98)); // #2aa198
     env.set(theme::GREEN, Color::rgb8(0x85, 0x99, 0x00)); // #859900
+
+    // Overrides
+    env.set(druid::theme::FONT_NAME, "Rec Mono Duotone");
+    env.set(druid::theme::TEXT_SIZE_NORMAL, 12.0);
+    env.set(druid::theme::BACKGROUND_LIGHT, env.get(theme::BASE_3));
+    env.set(druid::theme::LABEL_COLOR, env.get(theme::BASE_00));
+    env.set(druid::theme::PRIMARY_LIGHT, env.get(theme::BASE_3));
+    env.set(druid::theme::BORDER_DARK, env.get(theme::BASE_3));
 }
 
 fn setup_logger() -> Result<()> {
@@ -100,4 +132,9 @@ fn setup_logger() -> Result<()> {
         // .chain(fern::log_file("output.log")?)
         .apply()?;
     Ok(())
+}
+
+mod consts {
+    use druid::Selector;
+    pub const CS_TAKE_FOCUS: Selector = Selector::new("gitools.cs.take-focus");
 }

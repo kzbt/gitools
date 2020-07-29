@@ -1,14 +1,17 @@
 use crate::git::RepoHeader;
-use druid::{Data, Lens, Size};
+use druid::{Data, Lens, Size, WidgetId};
 use serde::{Deserialize, Deserializer};
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Data, Lens, Debug)]
 pub struct AppState {
     pub win_size: Size,
     pub repo_header: RepoHeader,
     pub cheatsheet: CheatSheetState,
+    pub fuzzybar: FuzzybarState,
+    pub git: GitState,
 }
 
 #[derive(Clone, Data, Lens, Debug)]
@@ -19,11 +22,39 @@ pub struct CheatSheetState {
     pub current_level: KeyMapLevel,
 }
 
-#[derive(Clone, PartialEq, Data, Debug, Deserialize)]
+#[derive(Clone, Data, Lens, Debug)]
+pub struct FuzzybarState {
+    pub is_hidden: bool,
+    pub cmd: Command,
+    pub query: String,
+    pub source: Arc<Vec<String>>,
+    pub filtered: Arc<Vec<String>>,
+}
+
+impl FuzzybarState {
+    pub fn filter(&mut self) {
+        self.filtered = Arc::new(
+            self.source
+                .iter()
+                .filter(|s| s.contains(&self.query))
+                .map(|s| s.to_owned())
+                .collect(),
+        );
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Data, Debug, Deserialize)]
 pub enum Command {
     ShowMenu,
     BranchCheckout,
     Commit,
+}
+
+#[derive(Clone, Data, Lens, Debug)]
+pub struct GitState {
+    pub local_branches: Arc<Vec<String>>,
+    pub remote_branches: Arc<Vec<String>>,
+    pub all_branches: Arc<Vec<String>>,
 }
 
 pub type KeyMap = Rc<BTreeMap<u8, L1Node>>;

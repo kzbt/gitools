@@ -7,6 +7,7 @@ use druid::{
     LifeCycleCtx, PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 use druid::{Code, KbKey};
+use std::rc::Rc;
 
 fn key_str_to_u8<T: AsRef<str>>(key: T) -> u8 {
     *key.as_ref().as_bytes().get(0).unwrap()
@@ -75,6 +76,11 @@ impl CheatSheet {
             }
         }
     }
+
+    fn reset_menu(&self, data: &mut AppState) {
+        data.cheatsheet.current_node = 0;
+        data.cheatsheet.current_level = KeyMapLevel::L1;
+    }
 }
 
 const CHEATSHEET_HEIGHT: f64 = 200.0;
@@ -103,7 +109,17 @@ impl Widget<AppState> for CheatSheet {
     }
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
-        ctx.request_focus();
+        if let Event::WindowConnected = event {
+            ctx.request_focus();
+        }
+
+        if let Event::Command(cmd) = event {
+            if cmd.is(crate::consts::CS_TAKE_FOCUS) {
+                ctx.request_focus();
+                ctx.set_handled();
+                self.reset_menu(data);
+            }
+        }
 
         if let Event::KeyUp(key_event) = event {
             let code = key_event.code;
@@ -116,15 +132,13 @@ impl Widget<AppState> for CheatSheet {
                 Code::Escape => {
                     if !data.cheatsheet.is_hidden {
                         data.cheatsheet.is_hidden = true;
-                        data.cheatsheet.current_node = 0;
-                        data.cheatsheet.current_level = KeyMapLevel::L1;
+                        self.reset_menu(data);
                     }
                 }
                 Code::Backspace => {
                     if !data.cheatsheet.is_hidden {
                         if let KeyMapLevel::L2(_) = data.cheatsheet.current_level {
-                            data.cheatsheet.current_node = 0;
-                            data.cheatsheet.current_level = KeyMapLevel::L1;
+                            self.reset_menu(data);
                         } else {
                             data.cheatsheet.is_hidden = true;
                         }
@@ -132,6 +146,21 @@ impl Widget<AppState> for CheatSheet {
                 }
                 _ => {
                     if let KbKey::Character(c) = key {
+                        if let KeyMapLevel::L2(parent_node) = data.cheatsheet.current_level {
+                            if let Some(l1_node) = data.cheatsheet.keymap.get(&parent_node) {
+                                if let Some(l2_node) = l1_node.next.get(&key_str_to_u8(c)) {
+                                    data.cheatsheet.is_hidden = true;
+
+                                    data.fuzzybar.is_hidden = false;
+                                    data.fuzzybar.cmd = l2_node.command;
+
+                                    if ctx.is_focused() {
+                                        ctx.focus_next();
+                                    }
+                                }
+                            }
+                        }
+
                         if let Some(l1_node) = data.cheatsheet.keymap.get(&key_str_to_u8(c)) {
                             data.cheatsheet.current_node = l1_node.key;
                             data.cheatsheet.current_level = KeyMapLevel::L2(l1_node.key);
@@ -176,7 +205,7 @@ impl Widget<AppState> for CheatSheet {
 
         let max_width = size.width;
 
-        let font_size = env.get(theme::TEXT_SIZE_NORMAL);
+        let font_size = env.get(druid::theme::TEXT_SIZE_NORMAL);
 
         let mut pos_x = 0.0 + PADDING_LEFT;
         let mut pos_y = 0.0 + PADDING_TOP;

@@ -1,8 +1,5 @@
 use druid::{Color, Key};
 
-pub const FONT_NAME: Key<&str> = Key::new("font_name");
-pub const TEXT_SIZE_NORMAL: Key<f64> = Key::new("text_size_normal");
-
 pub const BASE_3: Key<Color> = Key::new("theme_base_3");
 pub const BASE_2: Key<Color> = Key::new("theme_base_2");
 pub const BASE_1: Key<Color> = Key::new("theme_base_1");
