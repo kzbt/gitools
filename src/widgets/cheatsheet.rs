@@ -267,11 +267,3 @@ impl Widget<AppState> for CheatSheet {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn cheatsheet_layout_should_be_dynamic() {
-        let cheatsheet = super::CheatSheet::new((1000.0, 800.0).into());
-    }
-}

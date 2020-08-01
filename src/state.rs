@@ -1,6 +1,8 @@
 use crate::git::RepoHeader;
 use druid::{Data, Lens, Size, WidgetId};
+use im::{vector, Vector};
 use serde::{Deserialize, Deserializer};
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -27,19 +29,43 @@ pub struct FuzzybarState {
     pub is_hidden: bool,
     pub cmd: Command,
     pub query: String,
-    pub source: Arc<Vec<String>>,
-    pub filtered: Arc<Vec<String>>,
+    pub source: Vector<String>,
+    pub filtered: Vector<ListItem>,
+}
+
+#[derive(Clone, Data, Lens, Debug, PartialEq)]
+pub struct ListItem {
+    pub name: String,
+    pub selected: bool,
 }
 
 impl FuzzybarState {
     pub fn filter(&mut self) {
-        self.filtered = Arc::new(
-            self.source
-                .iter()
-                .filter(|s| s.contains(&self.query))
-                .map(|s| s.to_owned())
-                .collect(),
-        );
+        let mut new = vector![];
+
+        let mut selected = false;
+        let mut found = true;
+        for name in self.source.iter() {
+            if name.contains(&self.query) {
+                if found && !selected {
+                    selected = true;
+                    found = false;
+                }
+
+                if new.len() >= 20 {
+                    break;
+                }
+
+                new.push_back(ListItem {
+                    name: name.to_owned(),
+                    selected,
+                });
+
+                selected = false;
+            }
+        }
+
+        self.filtered = new;
     }
 }
 
@@ -52,9 +78,9 @@ pub enum Command {
 
 #[derive(Clone, Data, Lens, Debug)]
 pub struct GitState {
-    pub local_branches: Arc<Vec<String>>,
-    pub remote_branches: Arc<Vec<String>>,
-    pub all_branches: Arc<Vec<String>>,
+    pub local_branches: Vector<String>,
+    pub remote_branches: Vector<String>,
+    pub all_branches: Vector<String>,
 }
 
 pub type KeyMap = Rc<BTreeMap<u8, L1Node>>;
@@ -155,4 +181,59 @@ where
         .collect();
 
     Ok(Rc::new(result))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fuzzybarstate_should_filter() {
+        let mut s = FuzzybarState {
+            is_hidden: true,
+            cmd: Command::ShowMenu,
+            query: "b".to_owned(),
+            source: vector![
+                "aa".to_owned(),
+                "ab".to_owned(),
+                "bc".to_owned(),
+                "bca".to_owned()
+            ],
+            filtered: vector![],
+        };
+
+        s.filter();
+        let expected = vector![
+            ListItem {
+                name: "ab".to_owned(),
+                selected: true
+            },
+            ListItem {
+                name: "bc".to_owned(),
+                selected: false
+            },
+            ListItem {
+                name: "bca".to_owned(),
+                selected: false
+            },
+        ];
+        assert_eq!(expected, s.filtered);
+    }
+
+    #[test]
+    fn filtered_should_have_limited_items() {
+        let source = (1..200)
+            .map(|s| format!("Item {}", s))
+            .collect::<Vector<String>>();
+        let mut s = FuzzybarState {
+            is_hidden: true,
+            cmd: Command::ShowMenu,
+            query: "2".to_owned(),
+            source,
+            filtered: vector![],
+        };
+
+        s.filter();
+        assert_eq!(20, s.filtered.len());
+    }
 }

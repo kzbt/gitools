@@ -1,20 +1,33 @@
-use crate::state::{AppState, Command, FuzzybarState};
+use crate::state::{AppState, Command, FuzzybarState, ListItem};
 use crate::theme;
-use druid::widget::{Label, List, Scroll, SizedBox, TextBox};
+use druid::widget::{Label, List, Painter, Scroll, SizedBox, TextBox};
 use druid::{
     BoxConstraints, Code, Color, Data, Env, Event, EventCtx, KbKey, KeyCode, LayoutCtx, Lens,
     LensExt, LifeCycle, LifeCycleCtx, PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget,
     WidgetExt, WidgetPod,
 };
-use std::sync::Arc;
+use im::{vector, Vector};
+use std::time::{Duration, Instant};
 
+const FUZZYBAR_HEIGHT: f64 = 200.0;
+const LABEL_HEIGHT: f64 = 24.0;
+const DEBOUNCE_DELTA: Duration = Duration::from_millis(200);
+
+/// Fuzzybar is a fuzzy search bar similar to those provided by those completion
+/// frameworks provided by emacs helm. The main components are a querybar which
+/// contains the search textbox and a list of items that matches the text.
+///
+/// A Fuzzybar whenever initiated must be provided with some source data ([`im::Vector<T>`])
+/// and a closure that will be invoked on executing a single item
+///
+/// Fuzzybar also paints its own selection rects and highlights its background.
 pub struct Fuzzybar {
-    // querybar: TextBox,
-    // matches: WidgetPod<AppState, Scroll<AppState, List<AppState>>>,
     querybar: WidgetPod<AppState, SizedBox<AppState>>,
-    matches: WidgetPod<AppState, SizedBox<AppState>>,
+    matches: WidgetPod<Vector<ListItem>, Scroll<Vector<ListItem>, List<ListItem>>>,
     size: Size,
-    db: debouncer::Debouncer,
+    ts_since_last_event: Instant,
+    selected_idx: usize,
+    scrolled: bool,
 }
 
 impl Fuzzybar {
@@ -26,40 +39,115 @@ impl Fuzzybar {
         let querybar = WidgetPod::new(textbox);
 
         let scroll = Scroll::new(List::new(|| {
-            Label::new(|item: &String, env: &Env| item.to_owned())
+            let painter = Painter::new(|ctx, item: &ListItem, env| {
+                let color = if item.selected {
+                    env.get(theme::BASE_2)
+                } else {
+                    env.get(theme::BASE_3)
+                };
+
+                let bounds = ctx.size().to_rect();
+
+                ctx.fill(bounds, &color);
+            });
+            Label::new(|item: &ListItem, _env: &_| item.name.to_owned())
+                .padding(3.0)
+                .background(painter)
         }))
-        .vertical()
-        .lens(AppState::fuzzybar.then(FuzzybarState::filtered))
-        .expand_width();
+        .vertical();
 
         let matches = WidgetPod::new(scroll);
 
         let size = (0.0, FUZZYBAR_HEIGHT).into();
 
-        let db = debouncer::Debouncer::new(1);
-
         Fuzzybar {
             querybar,
             matches,
             size,
-            db,
+            ts_since_last_event: Instant::now(),
+            selected_idx: 0,
+            scrolled: false,
         }
     }
 
-    fn update_source(&self, data: &mut AppState) {
+    fn update_source(&mut self, data: &mut AppState) {
         let source = match data.fuzzybar.cmd {
             Command::BranchCheckout => data.git.all_branches.clone(),
-            _ => Arc::new(vec![]),
+            _ => vector![],
         };
 
         data.fuzzybar.source = source;
         data.fuzzybar.filter();
+        self.selected_idx = 0;
+    }
+
+    fn move_selection_up(&mut self, data: &mut AppState) {
+        if self.selected_idx == 0 {
+            return;
+        }
+
+        data.fuzzybar
+            .filtered
+            .get_mut(self.selected_idx)
+            .unwrap()
+            .selected = false;
+        data.fuzzybar
+            .filtered
+            .get_mut(self.selected_idx - 1)
+            .unwrap()
+            .selected = true;
+        self.selected_idx -= 1;
+    }
+
+    fn scroll_down(&mut self) {
+        if self.selected_idx < 8 {
+            return;
+        }
+
+        let scroll_off = self.matches.widget().offset();
+        let next_off = scroll_off + druid::Vec2::new(0.0, LABEL_HEIGHT);
+        let delta = next_off - scroll_off;
+
+        let scroll_size = self.matches.widget().child_size();
+        let scroll_size = Size::new(scroll_size.width, FUZZYBAR_HEIGHT);
+        let scrolled = self.matches.widget_mut().scroll(delta, scroll_size);
+
+        if !self.scrolled {
+            self.scrolled = scrolled;
+        }
+    }
+
+    fn move_selection_down(&mut self, data: &mut AppState) {
+        if self.selected_idx + 1 == data.fuzzybar.filtered.len() {
+            return;
+        }
+        data.fuzzybar
+            .filtered
+            .get_mut(self.selected_idx)
+            .unwrap()
+            .selected = false;
+        data.fuzzybar
+            .filtered
+            .get_mut(self.selected_idx + 1)
+            .unwrap()
+            .selected = true;
+        self.selected_idx += 1;
+    }
+
+    fn scroll_up(&mut self) {
+        if self.selected_idx > 12 {
+            return;
+        }
+
+        let scroll_off = self.matches.widget().offset();
+        let next_off = scroll_off - druid::Vec2::new(0.0, LABEL_HEIGHT);
+        let delta = next_off - scroll_off;
+
+        let scroll_size = self.matches.widget().child_size();
+        let scroll_size = Size::new(scroll_size.width, FUZZYBAR_HEIGHT);
+        self.scrolled = self.matches.widget_mut().scroll(delta, scroll_size);
     }
 }
-
-const FUZZYBAR_HEIGHT: f64 = 200.0;
-const PADDING_TOP: f64 = 8.0;
-const PADDING_LEFT: f64 = 8.0;
 
 impl Widget<AppState> for Fuzzybar {
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppState, env: &Env) {
@@ -71,7 +159,9 @@ impl Widget<AppState> for Fuzzybar {
         }
 
         self.querybar.lifecycle(ctx, event, data, env);
-        self.matches.lifecycle(ctx, event, data, env);
+        self.matches
+            .widget_mut()
+            .lifecycle(ctx, event, &data.fuzzybar.filtered, env);
     }
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
@@ -81,16 +171,16 @@ impl Widget<AppState> for Fuzzybar {
 
         ctx.request_focus();
 
-        self.querybar.widget_mut().event(ctx, event, data, env);
-
-        if let Event::KeyUp(key_event) = event {
-            let code = key_event.code;
-            let key = &key_event.key;
+        if let Event::KeyDown(key_event) = event {
+            let code = &key_event.code;
+            let mods = &key_event.mods;
 
             match code {
                 Code::Escape => {
                     if !data.fuzzybar.is_hidden {
                         data.fuzzybar.is_hidden = true;
+                        self.scrolled = false;
+                        self.selected_idx = 0;
 
                         if ctx.is_focused() {
                             ctx.resign_focus();
@@ -99,30 +189,47 @@ impl Widget<AppState> for Fuzzybar {
                         }
                     }
                 }
-                _ => {
-                    let db_result = self.db.update(0, true);
-                    match db_result {
-                        debouncer::DebounceResult::Pressed => {
-                            println!("Filtering...");
-                            self.update_source(data);
-                            self.db.update(0, false);
-                            self.db.update(0, false);
-                            self.db.update(0, false);
-                        }
-                        _ => (),
-                    }
+                Code::ControlLeft | Code::ControlRight => {
+                    ctx.set_handled();
                 }
+                Code::KeyJ if mods.ctrl() => {
+                    self.move_selection_down(data);
+                    self.scroll_down();
+                    ctx.set_handled();
+                }
+                Code::KeyK if mods.ctrl() => {
+                    self.move_selection_up(data);
+                    self.scroll_up();
+                    ctx.set_handled();
+                }
+                _ if !mods.ctrl() => {
+                    let now = Instant::now();
+                    let duration_since = now.duration_since(self.ts_since_last_event);
+                    if duration_since >= DEBOUNCE_DELTA {
+                        self.ts_since_last_event = now;
+                        self.update_source(data);
+                    }
+                    ctx.set_handled();
+                }
+                _ => ctx.set_handled(),
             }
         }
+
+        ctx.set_handled();
+
+        self.querybar.widget_mut().event(ctx, event, data, env);
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, _old: &AppState, data: &AppState, env: &Env) {
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &AppState, data: &AppState, env: &Env) {
         if data.fuzzybar.is_hidden {
             return;
         }
 
         self.querybar.update(ctx, data, env);
-        self.matches.update(ctx, data, env);
+
+        if !old.fuzzybar.same(&data.fuzzybar) {
+            self.matches.update(ctx, &data.fuzzybar.filtered, env);
+        }
     }
 
     fn layout(
@@ -137,23 +244,28 @@ impl Widget<AppState> for Fuzzybar {
         }
 
         let mut size = bc.max();
-        size.height = FUZZYBAR_HEIGHT;
+        size.height = FUZZYBAR_HEIGHT + LABEL_HEIGHT;
         self.size = size;
 
         let child_bc = bc.loosen();
 
         let qb_size = self.querybar.layout(ctx, &child_bc, data, env);
-        let match_size = self.matches.layout(ctx, &child_bc, data, env);
 
         self.querybar
             .set_layout_rect(ctx, data, env, Rect::from_origin_size((0.0, 0.0), qb_size));
 
-        self.matches.set_layout_rect(
-            ctx,
-            data,
-            env,
-            Rect::from_origin_size((0.0, qb_size.height), match_size),
-        );
+        if !self.scrolled {
+            let match_size = self
+                .matches
+                .layout(ctx, &child_bc, &data.fuzzybar.filtered, env);
+
+            self.matches.set_layout_rect(
+                ctx,
+                &data.fuzzybar.filtered,
+                env,
+                Rect::from_origin_size((0.0, qb_size.height), match_size),
+            );
+        }
 
         size
     }
@@ -170,83 +282,6 @@ impl Widget<AppState> for Fuzzybar {
         ctx.fill(rect, &bg_color);
 
         self.querybar.paint(ctx, data, env);
-        self.matches.paint(ctx, data, env);
-    }
-}
-
-mod debouncer {
-
-    pub struct Debouncer {
-        patterns: Vec<u8>,
-    }
-
-    #[repr(u8)]
-    #[derive(PartialEq)]
-    pub enum DebounceResult {
-        NoChange,
-        Pressed,
-        Released,
-    }
-
-    impl Debouncer {
-        pub fn new(no_of_keys: usize) -> Debouncer {
-            Debouncer {
-                patterns: vec![0; no_of_keys],
-            }
-        }
-
-        pub fn update(&mut self, key_no: usize, pressed: bool) -> DebounceResult {
-            let next: u8 = if pressed { 1 } else { 0 };
-            self.patterns[key_no] = self.patterns[key_no] << 1 | next;
-            let mut result = DebounceResult::NoChange;
-            //debounce following hackadays ultimate debouncing schema
-            let mask: u8 = 0b11000111;
-            let seen = self.patterns[key_no] & mask;
-            if seen == 0b00000111 {
-                result = DebounceResult::Pressed;
-                self.patterns[key_no] = 0b1111111;
-            } else if seen == 0b11000000 {
-                result = DebounceResult::Released;
-                self.patterns[key_no] = 0b0000000;
-            }
-
-            return result;
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::{DebounceResult, Debouncer};
-        #[test]
-        fn it_works() {
-            let mut db = Debouncer::new(1);
-            //activate
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::Pressed);
-            //deactivate
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::Released);
-
-            //let's do noise.
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::Pressed);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, false) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-            assert!(db.update(0, true) == DebounceResult::NoChange);
-        }
+        self.matches.paint(ctx, &data.fuzzybar.filtered, env);
     }
 }

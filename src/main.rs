@@ -4,6 +4,7 @@ use druid::{
     AppLauncher, Color, DelegateCtx, Env, Event, Selector, Widget, WidgetExt, WindowDesc, WindowId,
 };
 use git2::Repository;
+use im::{vector, Vector};
 use log::info;
 use state::{AppState, CheatSheetState, Command, Config, FuzzybarState, GitState, KeyMapLevel};
 use std::rc::Rc;
@@ -36,15 +37,11 @@ fn main() -> Result<()> {
 
     let (local, remote) = git::get_branches(&repo);
 
-    let mut all_branches = vec![];
+    let mut all_branches = vector![];
     all_branches.extend(local.iter().cloned());
     all_branches.extend(remote.iter().cloned());
 
-    let (local, remote, all_b) = (Arc::new(local), Arc::new(remote), Arc::new(all_branches));
-
-    let fuzzybar_source = all_b.clone();
-
-    let app_state = AppState {
+    let mut app_state = AppState {
         win_size: WINDOW_SIZE.into(),
         repo_header: git::get_repo_header(&repo)?,
         cheatsheet: CheatSheetState {
@@ -57,15 +54,17 @@ fn main() -> Result<()> {
             is_hidden: true,
             cmd: Command::ShowMenu,
             query: "".to_owned(),
-            source: fuzzybar_source.clone(),
-            filtered: fuzzybar_source.clone(),
+            source: all_branches.clone(),
+            filtered: vector![],
         },
         git: GitState {
             local_branches: local,
             remote_branches: remote,
-            all_branches: all_b,
+            all_branches,
         },
     };
+
+    app_state.fuzzybar.filter();
 
     info!("Starting application...");
     AppLauncher::with_window(window)

@@ -11,6 +11,7 @@ log = "*"
 fern = "0.6"
 git2 = "0.13"
 keyboard-types = "*"
-druid = { git = "https://github.com/linebender/druid" }
+druid = { git = "https://github.com/linebender/druid", features = ["im"] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 toml = "0.5"
+im = "15.0"

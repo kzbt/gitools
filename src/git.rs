@@ -4,6 +4,7 @@ use anyhow::Result;
 use druid::widget::{Align, Container, CrossAxisAlignment, Flex, Label, SizedBox};
 use druid::{Data, Env, Widget, WidgetExt};
 use git2::{BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository};
+use im::{vector, Vector};
 use log::info;
 
 #[derive(Clone, Data, Debug)]
@@ -105,14 +106,14 @@ fn get_latest_tag(repo: &Repository) -> String {
     "<no-tags>".to_owned()
 }
 
-pub fn get_branches(repo: &Repository) -> (Vec<String>, Vec<String>) {
+pub fn get_branches(repo: &Repository) -> (Vector<String>, Vector<String>) {
     let branches = repo.branches(None);
     if branches.is_err() {
         info!("No branches in repo");
-        return (vec![], vec![]);
+        return (vector![], vector![]);
     }
 
-    let (mut local, mut remote) = (vec![], vec![]);
+    let (mut local, mut remote) = (vector![], vector![]);
 
     let branches = branches.unwrap();
     for b in branches {
@@ -120,8 +121,8 @@ pub fn get_branches(repo: &Repository) -> (Vec<String>, Vec<String>) {
             let (branch, typ) = b.unwrap();
             if let Ok(Some(branch_name)) = branch.name() {
                 match typ {
-                    BranchType::Local => local.push(branch_name.to_owned()),
-                    BranchType::Remote => remote.push(branch_name.to_owned()),
+                    BranchType::Local => local.push_back(branch_name.to_owned()),
+                    BranchType::Remote => remote.push_back(branch_name.to_owned()),
                 }
             }
         }
