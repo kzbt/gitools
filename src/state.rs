@@ -45,15 +45,16 @@ impl FuzzybarState {
 
         let mut selected = false;
         let mut found = true;
+
         for name in self.source.iter() {
+            if new.len() >= 20 {
+                break;
+            }
+
             if name.contains(&self.query) {
                 if found && !selected {
                     selected = true;
                     found = false;
-                }
-
-                if new.len() >= 20 {
-                    break;
                 }
 
                 new.push_back(ListItem {

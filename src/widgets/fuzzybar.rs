@@ -203,6 +203,8 @@ impl Widget<AppState> for Fuzzybar {
                     ctx.set_handled();
                 }
                 _ if !mods.ctrl() => {
+                    self.querybar.widget_mut().event(ctx, event, data, env);
+
                     let now = Instant::now();
                     let duration_since = now.duration_since(self.ts_since_last_event);
                     if duration_since >= DEBOUNCE_DELTA {
@@ -214,10 +216,6 @@ impl Widget<AppState> for Fuzzybar {
                 _ => ctx.set_handled(),
             }
         }
-
-        ctx.set_handled();
-
-        self.querybar.widget_mut().event(ctx, event, data, env);
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &AppState, data: &AppState, env: &Env) {
