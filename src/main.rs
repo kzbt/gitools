@@ -29,7 +29,7 @@ fn main() -> Result<()> {
         .title("Git Tools");
 
     let args: Vec<String> = std::env::args().collect();
-    let repo = Repository::open(&args[1])?;
+    let repo = Rc::new(Repository::open(&args[1])?);
 
     let config_str = std::fs::read_to_string("./config.toml").unwrap();
 
@@ -42,6 +42,7 @@ fn main() -> Result<()> {
     all_branches.extend(remote.iter().cloned());
 
     let mut app_state = AppState {
+        repo: repo.clone(),
         win_size: WINDOW_SIZE.into(),
         repo_header: git::get_repo_header(&repo)?,
         cheatsheet: CheatSheetState {

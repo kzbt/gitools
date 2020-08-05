@@ -1,11 +1,11 @@
-use crate::state::AppState;
+use crate::state::{AppState, Command};
 use crate::theme;
 use anyhow::Result;
 use druid::widget::{Align, Container, CrossAxisAlignment, Flex, Label, SizedBox};
 use druid::{Data, Env, Widget, WidgetExt};
 use git2::{BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository};
 use im::{vector, Vector};
-use log::info;
+use log::{debug, info};
 
 #[derive(Clone, Data, Debug)]
 pub struct RepoHeader {
@@ -89,7 +89,14 @@ pub fn get_repo_header(repo: &Repository) -> Result<RepoHeader> {
 fn get_commit_from_ref(repo: &Repository, reference: &Reference) -> Result<(String, String)> {
     let oid = reference.target().ok_or(anyhow!("No oid on ref"))?;
     let commit = repo.find_commit(oid)?;
-    let msg = commit.message().ok_or(anyhow!("No commit message"))?;
+    let msg = commit
+        .message()
+        .ok_or(anyhow!("No commit message"))?
+        .split("\n")
+        .next()
+        .unwrap();
+
+    debug!("Header commit msg: {}", msg);
 
     Ok((format!("{}", oid), msg.to_owned()))
 }
@@ -129,4 +136,20 @@ pub fn get_branches(repo: &Repository) -> (Vector<String>, Vector<String>) {
     }
 
     (local, remote)
+}
+
+pub fn execute_cmd(repo: &Repository, cmd: Command, selection: &str) {
+    match cmd {
+        Command::BranchCheckout => {
+            checkout_branch(repo, selection);
+        }
+        _ => (),
+    }
+}
+
+fn checkout_branch(repo: &Repository, name: &str) {
+    debug!("Checking out {}", name);
+    let head = "refs/heads/".to_owned() + name;
+    repo.set_head(&head);
+    repo.checkout_head(None);
 }

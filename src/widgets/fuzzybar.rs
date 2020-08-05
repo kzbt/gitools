@@ -1,3 +1,4 @@
+use crate::git;
 use crate::state::{AppState, Command, FuzzybarState, ListItem};
 use crate::theme;
 use druid::widget::{Label, List, Painter, Scroll, SizedBox, TextBox};
@@ -147,6 +148,27 @@ impl Fuzzybar {
         let scroll_size = Size::new(scroll_size.width, FUZZYBAR_HEIGHT);
         self.scrolled = self.matches.widget_mut().scroll(delta, scroll_size);
     }
+
+    fn execute_cmd(&mut self, data: &mut AppState) {
+        data.fuzzybar.is_hidden = true;
+        {
+            let selected = data.fuzzybar.filtered.get_mut(self.selected_idx).unwrap();
+            git::execute_cmd(&data.repo, data.fuzzybar.cmd, &selected.name);
+            data.repo_header = git::get_repo_header(&data.repo).unwrap();
+        }
+        self.reset_selection(data);
+    }
+
+    fn reset_selection(&mut self, data: &mut AppState) {
+        let selected = data.fuzzybar.filtered.get_mut(self.selected_idx).unwrap();
+        selected.selected = false;
+
+        let first = data.fuzzybar.filtered.get_mut(0).unwrap();
+        first.selected = true;
+
+        self.selected_idx = 0;
+        self.scrolled = false;
+    }
 }
 
 impl Widget<AppState> for Fuzzybar {
@@ -179,8 +201,7 @@ impl Widget<AppState> for Fuzzybar {
                 Code::Escape => {
                     if !data.fuzzybar.is_hidden {
                         data.fuzzybar.is_hidden = true;
-                        self.scrolled = false;
-                        self.selected_idx = 0;
+                        self.reset_selection(data);
 
                         if ctx.is_focused() {
                             ctx.resign_focus();
@@ -188,6 +209,12 @@ impl Widget<AppState> for Fuzzybar {
                             ctx.set_handled();
                         }
                     }
+                }
+                Code::Enter => {
+                    self.execute_cmd(data);
+                    ctx.resign_focus();
+                    ctx.submit_command(crate::consts::CS_TAKE_FOCUS, None);
+                    ctx.set_handled();
                 }
                 Code::ControlLeft | Code::ControlRight => {
                     ctx.set_handled();

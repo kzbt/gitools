@@ -1,14 +1,15 @@
 use crate::git::RepoHeader;
 use druid::{Data, Lens, Size, WidgetId};
+use git2::Repository;
 use im::{vector, Vector};
 use serde::{Deserialize, Deserializer};
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::sync::Arc;
 
-#[derive(Clone, Data, Lens, Debug)]
+#[derive(Clone, Data, Lens)]
 pub struct AppState {
+    pub repo: Rc<Repository>,
     pub win_size: Size,
     pub repo_header: RepoHeader,
     pub cheatsheet: CheatSheetState,
