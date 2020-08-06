@@ -15,3 +15,8 @@ druid = { git = "https://github.com/linebender/druid", features = ["im"] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 toml = "0.5"
 im = "15.0"
+
+[dev-dependencies]
+pretty_assertions = "*"
+tempfile = "*"
+lazy_static = "1"

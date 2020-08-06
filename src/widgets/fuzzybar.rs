@@ -310,3 +310,103 @@ impl Widget<AppState> for Fuzzybar {
         self.matches.paint(ctx, &data.fuzzybar.filtered, env);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests;
+    #[cfg(test)]
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    fn test<F>(tf: F)
+    where
+        F: FnOnce() -> (),
+    {
+        let has_logger = *tests::HAS_LOGGER;
+
+        if !has_logger {
+            tests::setup_test_logger();
+        }
+
+        tf();
+    }
+
+    #[test]
+    fn reset_selection_should_deselect_items_and_scroll() {
+        test(|| {
+            let (_td, repo) = tests::repo_init();
+            let _ = tests::commit(&repo);
+            let mut data = tests::state_init(repo);
+
+            let mut fuzzybar = Fuzzybar::new();
+            fuzzybar.reset_selection(&mut data);
+            assert_eq!(fuzzybar.selected_idx, 0);
+            assert_eq!(fuzzybar.scrolled, false);
+        })
+    }
+
+    #[test]
+    fn execute_cmd_branch_checkout() {
+        test(|| {
+            let (_td, repo) = tests::repo_init();
+            let _ = tests::commit(&repo);
+            let _ = tests::branch(&repo, "b1");
+            let mut data = tests::state_init(repo);
+            data.fuzzybar.cmd = Command::BranchCheckout;
+
+            let mut fuzzybar = Fuzzybar::new();
+            fuzzybar.selected_idx = data
+                .fuzzybar
+                .filtered
+                .iter()
+                .position(|b| b.name == "b1")
+                .unwrap();
+            fuzzybar.execute_cmd(&mut data);
+
+            let head = data.repo.head().unwrap();
+            let branch = head.name().unwrap();
+            assert_eq!(branch, "refs/heads/b1");
+        })
+    }
+
+    #[test]
+    fn move_selection_down_should_move_selected() {
+        let (_td, repo) = tests::repo_init();
+        let _ = tests::commit(&repo);
+        let _ = tests::branch(&repo, "b1");
+        let mut data = tests::state_init(repo);
+        data.fuzzybar.cmd = Command::BranchCheckout;
+
+        let mut fuzzybar = Fuzzybar::new();
+        fuzzybar.move_selection_down(&mut data);
+
+        let selected = data
+            .fuzzybar
+            .filtered
+            .get_mut(fuzzybar.selected_idx)
+            .unwrap();
+        assert_eq!(selected.selected, true);
+        assert_eq!(fuzzybar.selected_idx, 1);
+    }
+
+    #[test]
+    fn move_selection_up_should_move_selected() {
+        let (_td, repo) = tests::repo_init();
+        let _ = tests::commit(&repo);
+        let _ = tests::branch(&repo, "b1");
+        let mut data = tests::state_init(repo);
+        data.fuzzybar.cmd = Command::BranchCheckout;
+
+        let mut fuzzybar = Fuzzybar::new();
+        fuzzybar.move_selection_down(&mut data);
+        fuzzybar.move_selection_up(&mut data);
+
+        let selected = data
+            .fuzzybar
+            .filtered
+            .get_mut(fuzzybar.selected_idx)
+            .unwrap();
+        assert_eq!(selected.selected, true);
+        assert_eq!(fuzzybar.selected_idx, 0);
+    }
+}

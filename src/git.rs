@@ -1,6 +1,6 @@
 use crate::state::{AppState, Command};
 use crate::theme;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use druid::widget::{Align, Container, CrossAxisAlignment, Flex, Label, SizedBox};
 use druid::{Data, Env, Widget, WidgetExt};
 use git2::{BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository};

@@ -8,10 +8,9 @@ use im::{vector, Vector};
 use log::info;
 use state::{AppState, CheatSheetState, Command, Config, FuzzybarState, GitState, KeyMapLevel};
 use std::rc::Rc;
-use std::sync::Arc;
 
-#[macro_use]
-extern crate anyhow;
+#[cfg(test)]
+mod tests;
 
 mod git;
 mod state;
