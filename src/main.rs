@@ -31,7 +31,6 @@ fn main() -> Result<()> {
     let repo = Rc::new(Repository::open(&args[1])?);
 
     let config_str = std::fs::read_to_string("./config.toml").unwrap();
-
     let config: Config = toml::from_str(&config_str).unwrap();
 
     let (local, remote) = git::get_branches(&repo);
@@ -40,10 +39,12 @@ fn main() -> Result<()> {
     all_branches.extend(local.iter().cloned());
     all_branches.extend(remote.iter().cloned());
 
+    let header = widgets::header::RepoHeader::new(&repo)?;
+
     let mut app_state = AppState {
         repo: repo.clone(),
         win_size: WINDOW_SIZE.into(),
-        repo_header: widgets::header::get_repo_header(&repo)?,
+        repo_header: header,
         cheatsheet: CheatSheetState {
             is_hidden: true,
             keymap: config.keymap.map,
@@ -77,8 +78,9 @@ fn main() -> Result<()> {
 fn build_root() -> impl Widget<AppState> {
     let fuzzybar = widgets::fuzzybar::Fuzzybar::new();
     let cheatsheet = widgets::cheatsheet::CheatSheet::new(WINDOW_SIZE.into());
+    let header = widgets::header::RepoHeader::widget();
     let contents = Flex::column()
-        .with_child(widgets::header::build_repo_header())
+        .with_child(header)
         .with_flex_spacer(1.0)
         .with_child(cheatsheet)
         .with_child(fuzzybar);

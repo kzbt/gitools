@@ -17,7 +17,7 @@ pub fn get_commit_from_ref(repo: &Repository, reference: &Reference) -> Result<(
         .next()
         .unwrap();
 
-    debug!("Header commit msg: {}", msg);
+    debug!("Ref commit msg: {}", msg);
 
     Ok((format!("{}", oid), msg.to_owned()))
 }
@@ -59,6 +59,10 @@ pub fn get_branches(repo: &Repository) -> (Vector<String>, Vector<String>) {
     (local, remote)
 }
 
+// pub fn get_untracked(repo: &Repository)
+
+/// Handle commands from the ui. Repository state will change depending
+/// on the issued command
 pub fn execute_cmd(repo: &Repository, cmd: Command, selection: &str) {
     match cmd {
         Command::BranchCheckout => {

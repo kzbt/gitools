@@ -154,7 +154,7 @@ impl Fuzzybar {
         {
             let selected = data.fuzzybar.filtered.get_mut(self.selected_idx).unwrap();
             git::execute_cmd(&data.repo, data.fuzzybar.cmd, &selected.name);
-            data.repo_header = crate::widgets::header::get_repo_header(&data.repo).unwrap();
+            data.repo_header = crate::widgets::header::RepoHeader::new(&data.repo).unwrap();
         }
         self.reset_selection(data);
     }
