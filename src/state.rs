@@ -1,4 +1,4 @@
-use crate::git::RepoHeader;
+use crate::widgets::header::RepoHeader;
 use druid::{Data, Lens, Size, WidgetId};
 use git2::Repository;
 use im::{vector, Vector};

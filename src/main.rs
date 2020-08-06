@@ -43,7 +43,7 @@ fn main() -> Result<()> {
     let mut app_state = AppState {
         repo: repo.clone(),
         win_size: WINDOW_SIZE.into(),
-        repo_header: git::get_repo_header(&repo)?,
+        repo_header: widgets::header::get_repo_header(&repo)?,
         cheatsheet: CheatSheetState {
             is_hidden: true,
             keymap: config.keymap.map,
@@ -78,7 +78,7 @@ fn build_root() -> impl Widget<AppState> {
     let fuzzybar = widgets::fuzzybar::Fuzzybar::new();
     let cheatsheet = widgets::cheatsheet::CheatSheet::new(WINDOW_SIZE.into());
     let contents = Flex::column()
-        .with_child(git::build_repo_header())
+        .with_child(widgets::header::build_repo_header())
         .with_flex_spacer(1.0)
         .with_child(cheatsheet)
         .with_child(fuzzybar);
