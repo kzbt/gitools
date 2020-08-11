@@ -1,9 +1,12 @@
 use crate::state::{AppState, Command};
 use crate::theme;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use druid::widget::{Align, Container, CrossAxisAlignment, Flex, Label, SizedBox};
 use druid::{Data, Env, Widget, WidgetExt};
-use git2::{BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository};
+use git2::{
+    BranchType, DescribeFormatOptions, DescribeOptions, Reference, Repository, Status,
+    StatusOptions, Statuses,
+};
 use im::{vector, Vector};
 use log::{debug, info};
 
@@ -59,7 +62,12 @@ pub fn get_branches(repo: &Repository) -> (Vector<String>, Vector<String>) {
     (local, remote)
 }
 
-// pub fn get_untracked(repo: &Repository)
+pub fn get_statuses(repo: &Repository) -> Result<Statuses> {
+    let mut status_opts = StatusOptions::new();
+    let mut status_opts = status_opts.include_untracked(true);
+    repo.statuses(Some(&mut status_opts))
+        .context("Failed to get status")
+}
 
 /// Handle commands from the ui. Repository state will change depending
 /// on the issued command

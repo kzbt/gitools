@@ -40,11 +40,13 @@ fn main() -> Result<()> {
     all_branches.extend(remote.iter().cloned());
 
     let header = widgets::header::RepoHeader::new(&repo)?;
+    let status = widgets::status::RepoStatusDetail::new(&repo);
 
     let mut app_state = AppState {
         repo: repo.clone(),
         win_size: WINDOW_SIZE.into(),
         repo_header: header,
+        repo_status: status,
         cheatsheet: CheatSheetState {
             is_hidden: true,
             keymap: config.keymap.map,
@@ -79,8 +81,11 @@ fn build_root() -> impl Widget<AppState> {
     let fuzzybar = widgets::fuzzybar::Fuzzybar::new();
     let cheatsheet = widgets::cheatsheet::CheatSheet::new(WINDOW_SIZE.into());
     let header = widgets::header::RepoHeader::widget();
+    let status = widgets::status::RepoStatusDetail::widget();
     let contents = Flex::column()
         .with_child(header)
+        .with_spacer(24.0)
+        .with_child(status)
         .with_flex_spacer(1.0)
         .with_child(cheatsheet)
         .with_child(fuzzybar);

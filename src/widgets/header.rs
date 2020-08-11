@@ -97,11 +97,10 @@ impl RepoHeader {
             .with_child(lbl_tag)
             .with_child(lbl_tag_tag.with_text_color(theme::YELLOW));
 
-        let layout = Flex::column()
+        Flex::column()
             .with_child(row_head)
             .with_child(row_ups)
             .with_child(row_tag)
-            .cross_axis_alignment(CrossAxisAlignment::Start);
-        layout
+            .cross_axis_alignment(CrossAxisAlignment::Start)
     }
 }
