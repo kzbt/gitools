@@ -29,30 +29,63 @@ impl RepoStatusDetail {
             error!("Failed to get status: {}", err);
             return Self::default();
         }
-        let mut status = RepoStatusDetail::default();
+        let mut statusdetail = RepoStatusDetail::default();
 
         for s in statuses.unwrap().iter() {
             let path = s.path().unwrap().to_owned();
-            match s.status() {
-                Status::WT_NEW => status.untracked.push_back(path),
-                Status::WT_MODIFIED => status.unstaged.push_back((ST_MODIFIED.to_owned(), path)),
-                Status::WT_RENAMED => status.unstaged.push_back((ST_RENAMED.to_owned(), path)),
-                Status::WT_DELETED => status.unstaged.push_back((ST_DELETED.to_owned(), path)),
-                Status::WT_TYPECHANGE => {
-                    status.unstaged.push_back((ST_TYPECHANGE.to_owned(), path))
-                }
-                Status::INDEX_NEW => status.staged.push_back((ST_NEW.to_owned(), path)),
-                Status::INDEX_MODIFIED => status.staged.push_back((ST_MODIFIED.to_owned(), path)),
-                Status::INDEX_RENAMED => status.staged.push_back((ST_RENAMED.to_owned(), path)),
-                Status::INDEX_DELETED => status.staged.push_back((ST_DELETED.to_owned(), path)),
-                Status::INDEX_TYPECHANGE => {
-                    status.staged.push_back((ST_TYPECHANGE.to_owned(), path))
-                }
-                _ => (),
+            let status = s.status();
+
+            if status == Status::WT_NEW {
+                statusdetail.untracked.push_back(path.clone())
+            }
+            if status.contains(Status::WT_MODIFIED) {
+                statusdetail
+                    .unstaged
+                    .push_back((ST_MODIFIED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::WT_RENAMED) {
+                statusdetail
+                    .unstaged
+                    .push_back((ST_RENAMED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::WT_DELETED) {
+                statusdetail
+                    .unstaged
+                    .push_back((ST_DELETED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::WT_TYPECHANGE) {
+                statusdetail
+                    .unstaged
+                    .push_back((ST_TYPECHANGE.to_owned(), path.clone()));
+            }
+            if status.contains(Status::INDEX_NEW) {
+                statusdetail
+                    .staged
+                    .push_back((ST_NEW.to_owned(), path.clone()));
+            }
+            if status.contains(Status::INDEX_MODIFIED) {
+                statusdetail
+                    .staged
+                    .push_back((ST_MODIFIED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::INDEX_RENAMED) {
+                statusdetail
+                    .staged
+                    .push_back((ST_RENAMED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::INDEX_DELETED) {
+                statusdetail
+                    .staged
+                    .push_back((ST_DELETED.to_owned(), path.clone()));
+            }
+            if status.contains(Status::INDEX_TYPECHANGE) {
+                statusdetail
+                    .staged
+                    .push_back((ST_TYPECHANGE.to_owned(), path));
             }
         }
 
-        status
+        statusdetail
     }
 
     pub fn widget() -> impl Widget<AppState> {
@@ -67,20 +100,26 @@ impl RepoStatusDetail {
         );
 
         let unstaged_header = Flex::row().with_flex_child(
-            Label::new("Unstaged files").with_text_color(theme::BLUE),
+            Label::new("Unstaged changes").with_text_color(theme::BLUE),
             1.0,
         );
         let unstaged_files = Flex::row().with_flex_child(
-            List::new(|| Label::new(|item: &(String, String), _env: &_| item.1.clone()))
-                .lens(AppState::repo_status.then(RepoStatusDetail::unstaged)),
+            List::new(|| {
+                Label::new(|item: &(String, String), _env: &_| format!("{}\t\t{}", item.0, item.1))
+            })
+            .lens(AppState::repo_status.then(RepoStatusDetail::unstaged)),
             1.0,
         );
 
-        let staged_header = Flex::row()
-            .with_flex_child(Label::new("Staged files").with_text_color(theme::BLUE), 1.0);
+        let staged_header = Flex::row().with_flex_child(
+            Label::new("Staged changes").with_text_color(theme::BLUE),
+            1.0,
+        );
         let staged_files = Flex::row().with_flex_child(
-            List::new(|| Label::new(|item: &(String, String), _env: &_| item.1.clone()))
-                .lens(AppState::repo_status.then(RepoStatusDetail::staged)),
+            List::new(|| {
+                Label::new(|item: &(String, String), _env: &_| format!("{}\t\t{}", item.0, item.1))
+            })
+            .lens(AppState::repo_status.then(RepoStatusDetail::staged)),
             1.0,
         );
 

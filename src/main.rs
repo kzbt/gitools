@@ -115,6 +115,7 @@ fn configure_env(env: &mut Env, app: &AppState) {
 
     // Overrides
     env.set(druid::theme::FONT_NAME, "Rec Mono Duotone");
+    // env.set(druid::theme::FONT_NAME, "RecursiveSansLnr-Regular");
     env.set(druid::theme::TEXT_SIZE_NORMAL, 12.0);
     env.set(druid::theme::BACKGROUND_LIGHT, env.get(theme::BASE_3));
     env.set(druid::theme::LABEL_COLOR, env.get(theme::BASE_00));

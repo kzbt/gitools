@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 
 const FUZZYBAR_HEIGHT: f64 = 200.0;
 const LABEL_HEIGHT: f64 = 24.0;
+const LABEL_PADDING: f64 = 3.0;
+const LABEL_SCROLL: f64 = LABEL_HEIGHT; // + (2.0 * LABEL_PADDING);
 const DEBOUNCE_DELTA: Duration = Duration::from_millis(200);
 
 /// Fuzzybar is a fuzzy search bar similar to those provided by those completion
@@ -51,8 +53,9 @@ impl Fuzzybar {
 
                 ctx.fill(bounds, &color);
             });
-            Label::new(|item: &ListItem, _env: &_| item.name.to_owned())
-                .padding(3.0)
+            Label::new(|item: &ListItem, _env: &Env| item.name.to_owned())
+                .padding(LABEL_PADDING)
+                .fix_height(LABEL_HEIGHT)
                 .background(painter)
         }))
         .vertical();
@@ -106,7 +109,7 @@ impl Fuzzybar {
         }
 
         let scroll_off = self.matches.widget().offset();
-        let next_off = scroll_off + druid::Vec2::new(0.0, LABEL_HEIGHT);
+        let next_off = scroll_off + druid::Vec2::new(0.0, LABEL_SCROLL);
         let delta = next_off - scroll_off;
 
         let scroll_size = self.matches.widget().child_size();
@@ -141,7 +144,7 @@ impl Fuzzybar {
         }
 
         let scroll_off = self.matches.widget().offset();
-        let next_off = scroll_off - druid::Vec2::new(0.0, LABEL_HEIGHT);
+        let next_off = scroll_off - druid::Vec2::new(0.0, LABEL_SCROLL);
         let delta = next_off - scroll_off;
 
         let scroll_size = self.matches.widget().child_size();
