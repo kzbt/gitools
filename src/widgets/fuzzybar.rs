@@ -139,7 +139,7 @@ impl Fuzzybar {
     }
 
     fn scroll_up(&mut self) {
-        if self.selected_idx > 12 {
+        if self.selected_idx < 7 {
             return;
         }
 
